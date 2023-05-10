@@ -1,7 +1,6 @@
-<<<<<<< HEAD
 # chat-gpt-game
 A platform video-game that uses chat-gpt to generate NPCs dialogs
-=======
+
 # Plataformas
 
 ## Información general
@@ -59,4 +58,3 @@ Solo he probado el juego en mi equipo así que seguramente puedes encontrar prob
 En ese caso por favor levanta un issue aquí en Github, con el mayor detalle que puedas (versión de python, de paquetes, mensaje completo de error, etc).
 
 Si eres ninja y lo solucionas, ¡levanta un Pull Request!
->>>>>>> 1c8ab80 (first commit)
