@@ -20,6 +20,7 @@ from webcam import Webcam
 
 class Game:
     def __init__(self):
+        self.webcam = None
         self.webcamImage = None
         self.retry = None
         self.group_powerups = None
@@ -63,7 +64,6 @@ class Game:
         self.initialize()
 
     def loop(self):
-        print("START LOOP")
         with self.mp_face_mesh.FaceMesh(
             static_image_mode=False,
             max_num_faces=1,
@@ -72,9 +72,8 @@ class Game:
         ) as self.face_mesh:
             while self.running:
                 if not self.webcam.ready():
-                    print("NOT WEBCAM READY")
-                    continue
-                print("WEBCAM READY")
+                    # continue
+                    pass
                 time = pygame.time.get_ticks()
                 if self.last_frame_time == -1:
                     delta_time = 1
@@ -86,11 +85,9 @@ class Game:
                 self.update(delta_time)
                 self.render()
                 self.clock.tick(60)
-            print("END LOOP")
             pygame.quit()
 
     def initialize(self):
-        print("START INITIALIZE")
         self.player = Player()
         self.no_face = False
         self.dead = False
@@ -140,7 +137,6 @@ class Game:
         self.mouthWasOpen = False
 
         self.max_face_area_height = 0
-        print("END INITIALIZE")
 
     def update(self, delta_time):
         events = pygame.event.get()

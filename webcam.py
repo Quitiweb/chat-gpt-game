@@ -1,4 +1,5 @@
 from threading import Thread
+
 import cv2
 
 
@@ -16,7 +17,8 @@ class Webcam:
 
     def update(self):
         if self.stream is None:
-            self.stream = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            # self.stream = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+            self.stream = cv2.VideoCapture(0)
         while True:
             if self.stopped:
                 return
