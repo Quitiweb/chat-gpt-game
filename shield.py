@@ -1,11 +1,12 @@
-import pygame
-from pygame.locals import *
-import globals
-from constants import *
 import random
+import pygame
+import globals
 
-WIDTH=48
-HEIGHT=48
+from constants import *
+
+WIDTH = 48
+HEIGHT = 48
+
 
 class Shield(pygame.sprite.Sprite):
 
@@ -27,7 +28,7 @@ class Shield(pygame.sprite.Sprite):
         if (self.rect.x + WIDTH) < 0:
             self.kill()
 
-    #Mostrar el hitbox, para debug
+    # Mostrar el hitbox, para debug
     def display_hitbox(self, dest):
         debugRect = pygame.Surface((self.rect.width,self.rect.height))
         debugRect.set_alpha(128)

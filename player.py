@@ -3,25 +3,28 @@ from pygame.locals import *
 from constants import *
 import globals
 
-WIDTH=100
-HEIGHT=100
+WIDTH = 100
+HEIGHT = 100
 HITBOX_WIDTH = 60
 HITBOX_HEIGHT = 100
 
 ASSET_SIZE = 48
 
-JUMP_POWER=12
+JUMP_POWER = 12
+
 
 class Player(pygame.sprite.Sprite):
+    """
+    Aqui si explico lo de las animaciones.
+    Aqui definimos cosas simples, que estamos en la animacion 'run',
+    un diccionario que contendra el detalle de las animaciones,
+    y otro que indica, por cada una, un 'tipo'.
+    continuous: Se repite, o 'loopea'. once: No lo hace (e.g. para brincar)
+    que se queda en el ultimo frame como 'cayendo'
+    """
     def __init__(self):
         super(Player, self).__init__()
 
-        #Aqui si explico lo de las animaciones.
-        #Aqui definimos cosas simples, que estamos en la animacion 'run',
-        #un diccionario que contendra el detalle de las animaciones,
-        #y otro que indica, por cada una, un 'tipo'.
-        #continuous: Se repite, o 'loopea'. once: No lo hace (e.g. para brincar)
-        #que se queda en el ultimo frame como 'cayendo'
         self.current_animation = "run"
         self.animations = {}
         self.animation_behaviour = {
@@ -32,7 +35,7 @@ class Player(pygame.sprite.Sprite):
 
         self.load_assets()
         
-        #Indice del frame de la animacion
+        # Indice del frame de la animacion
         self.idxAnimation = 0
         self.animationSpeed = .15
         self.surf = self.animations[self.current_animation][self.idxAnimation]
@@ -44,15 +47,16 @@ class Player(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(100, 300)
         self.acc = pygame.math.Vector2(0, .022)
 
-        #Cuantas veces has brincado
+        # Cuantas veces has brincado
         self.jumpCount=0
         self.canJump = False
         self.doJump = False
         self.wantedToJump = False
         self.wantToJumpTime = -1
         self.lastJumpTime = pygame.time.get_ticks()
-        #Cosas para mejorar el manejo de brincos (e.g. si quisiste brincar un poquito)
-        #antes de tocar el suelo, al tocarlo brinca automaticamente, etc
+
+        # Cosas para mejorar el manejo de brincos (e.g. si quisiste brincar un poquito)
+        # antes de tocar el suelo, al tocarlo brinca automaticamente, etc
         self.timeToHonorJumpAttempt = 100
         self.dead = False
         self.addScore = 0
@@ -62,53 +66,55 @@ class Player(pygame.sprite.Sprite):
         self.shieldSurf = pygame.transform.scale(self.shieldSurf, (WIDTH*1.1, HEIGHT*1.1))
         self.shieldRect = self.shieldSurf.get_rect()
 
-        #Al salvar con el escudo, a veces te acaba de salvar y se gasta
-        #un salto si lo haces sin querer, esto lo previene
+        # Al salvar con el escudo, a veces te acaba de salvar y se gasta
+        # un salto si lo haces sin querer, esto lo previene
         self.canOnlyJumpGoingDown = False
 
-    #Cargar una animacion especifica en base al nombre
-    #Como usamos al 'Punk', podemos usar solo las que estan en esa carpeta.
-    #Toda la animacion esta en un solo PNG, asi que itera en la imagen
-    #segun el ancho esperado de cada cuadro de la animacion, y lo carga
-    #en self.animations[nombre]
     def load_animation(self, name):
+        """
+        Cargar una animacion especifica en base al nombre
+        Como usamos al 'Punk', podemos usar solo las que estan en esa carpeta.
+        Toda la animacion esta en un solo PNG, asi que itera en la imagen
+        segun el ancho esperado de cada cuadro de la animacion, y lo carga
+        en self.animations[nombre]
+        """
         self.animations[name] = []
         asset = pygame.image.load("sprites/2 Punk/Punk_" + name + ".png").convert_alpha()
         width = asset.get_width()
         idx = 0
-        while (idx*ASSET_SIZE < width):
+        while idx*ASSET_SIZE < width:
             frame = pygame.Surface((ASSET_SIZE, ASSET_SIZE), pygame.SRCALPHA)
             frame.blit(asset, asset.get_rect(), Rect(idx*ASSET_SIZE, 0, ASSET_SIZE, ASSET_SIZE))
             self.animations[name].append(
                 frame
             )
-            idx+=1
+            idx += 1
             
-    #Cargas las animaciones a usar
+    # Cargas las animaciones a usar
     def load_assets(self):
         self.load_animation("run")
         self.load_animation("jump")
         self.load_animation("doublejump")
 
-    #Cambiar la animacion actual, reseteando el indice del frame
+    # Cambiar la animacion actual, reseteando el indice del frame
     def changeAnimation(self, name):
         if self.current_animation is not name:
             self.current_animation = name
             self.idxAnimation = 0
 
-    #Brincar
+    # Brincar
     def jump(self):
-        #Solo poder brincar si ya pasaron ciertos MS para evitar
-        #gastar dos saltos de inmediato
+        # Solo poder brincar si ya pasaron ciertos MS para evitar
+        # gastar dos saltos de inmediato
         if pygame.time.get_ticks() - self.lastJumpTime < 100:
             return
         self.lastJumpTime = pygame.time.get_ticks()
 
-        #Si me salvo el escudo y voy hacia arriba todavia, no permitir brincar
+        # Si me salvo el escudo y voy hacia arriba todavia, no permitir brincar
         if self.canOnlyJumpGoingDown and self.vel.y < 0:
             return
 
-        #Solo brincar cuando se puede, etc
+        # Solo brincar cuando se puede, etc
         if self.canJump:
             self.doJump = True
             self.wantedToJump = False
@@ -118,15 +124,17 @@ class Player(pygame.sprite.Sprite):
             self.wantedToJump = True
             self.wantToJumpTime = pygame.time.get_ticks()
 
-    #'Cancelar' el brinco para no brincar tan alto
+    # 'Cancelar' el brinco para no brincar tan alto
     def cancel_jump(self):
         if self.vel.y < -3:
             self.vel.y = -3
 
-    #Revisar colision con el piso. Para eso uso un 'hitbox', entonces
-    #cambio temporalmente el rect por el hitbox, reviso usando spritecollide,
-    #y luego lo regreso HOH
     def check_collisions_floor(self, spritegroup):
+        """
+        Revisar colision con el piso. Para eso uso un 'hitbox', entonces
+        cambio temporalmente el rect por el hitbox, reviso usando spritecollide,
+        y luego lo regreso HOH
+        """
         oldRect = self.rect
         self.rect = self.hitbox
         hits = pygame.sprite.spritecollide(self, spritegroup, False)
@@ -134,8 +142,8 @@ class Player(pygame.sprite.Sprite):
         self.colliding_with_floor = False
 
         if hits:
-            #Ver si ponemos al jugador arriba de la plataforma (cuando le pega de lado)
-            #y no esta mucho mas abajo que la plataforma, "salvandolo"...
+            # Ver si ponemos al jugador arriba de la plataforma (cuando le pega de lado)
+            # y no esta mucho mas abajo que la plataforma, "salvandolo"...
             if self.rect.bottom - hits[0].rect.top < (ASSET_SIZE/2) and self.vel.y >= 0:
                 self.vel.y = 0
                 self.jumpCount=0
@@ -149,7 +157,7 @@ class Player(pygame.sprite.Sprite):
             if self.jumpCount == 2:
                 self.canJump = False
 
-    #Colision con enemigos, si tengo escudo me lo quita, etc
+    # Colision con enemigos, si tengo escudo me lo quita, etc
     def check_collisions_enemies(self, enemies_group):
         hits = pygame.sprite.spritecollide(self, enemies_group, False, pygame.sprite.collide_mask)
         if hits:            
@@ -159,8 +167,8 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.dead = True
 
-    #Tomar un escudo. Aqui usamos el hitbox que es mas grande a los lados y arriba
-    #para agarrarlos mas facil
+    # Tomar un escudo. Aqui usamos el hitbox que es mas grande a los lados y arriba
+    # para agarrarlos mas facil
     def check_collisions_shields(self, group):
         oldRect = self.rect
         self.rect = self.hitbox
@@ -172,8 +180,8 @@ class Player(pygame.sprite.Sprite):
                 self.addScore += 5
                 hit.kill()
 
-    #Tomar dinero. Aqui usamos el hitbox que es mas grande a los lados y arriba
-    #para agarrarlos mas facil
+    # Tomar dinero. Aqui usamos el hitbox que es mas grande a los lados y arriba
+    # para agarrarlos mas facil
     def check_collisions_powerups(self, group):
         oldRect = self.rect
         self.rect = self.hitbox
@@ -184,9 +192,9 @@ class Player(pygame.sprite.Sprite):
                 self.addScore += 10
                 hit.kill()      
 
-    #En cada frame del juego se llama esto para cambiar el cuadro de la animacion
-    #y revisar si se va a repetir (continuous) o si nos quedamos en la ultima y ya
-    def animate(self,delta_time):
+    # En cada frame del juego se llama esto para cambiar el cuadro de la animacion
+    # y revisar si se va a repetir (continuous) o si nos quedamos en la ultima y ya
+    def animate(self, delta_time):
         self.animationSpeed = .008 * delta_time
         self.idxAnimation += self.animationSpeed
         if int(self.idxAnimation)+1 >= len(self.animations[self.current_animation]):
@@ -200,7 +208,8 @@ class Player(pygame.sprite.Sprite):
         self.update_hitbox()
         self.update_mask()
 
-    def update(self, delta_time, collision_floor_group, collision_group_powerups, collision_group_enemies, collision_group_shields):
+    def update(self, delta_time, collision_floor_group, collision_group_powerups,
+               collision_group_enemies, collision_group_shields):
         self.check_collisions_floor(collision_floor_group)
         self.check_collisions_powerups(collision_group_powerups)
         self.check_collisions_enemies(collision_group_enemies)
@@ -217,9 +226,9 @@ class Player(pygame.sprite.Sprite):
             self.wantedToJump = False
 
         if self.doJump:
-            #Si no esta en el piso, ya "gastamos" un salto
-            #esto es un tema cuando vas rapido y brincas
-            #al final de la plataforma
+            # Si no esta en el piso, ya "gastamos" un salto
+            # esto es un tema cuando vas rapido y brincas
+            # al final de la plataforma
             if self.jumpCount == 0 and not self.colliding_with_floor:
                 self.jumpCount += 1
 
@@ -232,11 +241,11 @@ class Player(pygame.sprite.Sprite):
             self.jumpCount += 1
             self.doJump = False
 
-        #Gravedad
+        # Gravedad
         self.vel += self.acc * delta_time
         self.pos += self.vel
 
-        #Nos fuimos hasta abajo? Escudo = Salvar. No escudo = MORIR
+        # Nos fuimos hasta abajo? Escudo = Salvar. No escudo = MORIR
         if self.rect.top > SCREEN_HEIGHT:
             if self.shield:
                 self.shield = False
@@ -252,8 +261,8 @@ class Player(pygame.sprite.Sprite):
         if self.canOnlyJumpGoingDown and self.vel.y > 0:
             self.canOnlyJumpGoingDown = False
             
-    #El escudo nos debe salvar de morir cayendo hacia abajo
-    #Se hace un megasalto automatico
+    # El escudo nos debe salvar de morir cayendo hacia abajo
+    # Se hace un megasalto automatico
     def shield_save(self):
         if self.shield:
             self.shield = False
@@ -272,22 +281,22 @@ class Player(pygame.sprite.Sprite):
             self.rect.center[1]+10,
         )
 
-    #HITBOX para colisiones con el piso, dinero, escudos
-    #Aumento .1 de ancho con cada game_speed
+    # HITBOX para colisiones con el piso, dinero, escudos
+    # Aumento .1 de ancho con cada game_speed
     def update_hitbox(self):
         self.hitbox = pygame.Rect(
             self.rect.x * 1 + (.1 * globals.game_speed), self.rect.y,
             HITBOX_WIDTH, HITBOX_HEIGHT
         )
     
-    #MASK (mascara) para colisiones con enemigos (un poco mas pequenas que
+    # MASK (mascara) para colisiones con enemigos (un poco mas pequenas que
     # el jugador para que sea mas 'justo' o 'facil')
     def update_mask(self):
         self.maskSurface = self.surf
-        self.maskSurface = pygame.transform.scale(self.maskSurface, (WIDTH*.8,HEIGHT*.8))
+        self.maskSurface = pygame.transform.scale(self.maskSurface, (WIDTH*.8, HEIGHT*.8))
         self.mask = pygame.mask.from_surface(self.maskSurface)
 
-    #Mostrar el hitbox en pantalla, para debug
+    # Mostrar el hitbox en pantalla, para debug
     def display_hitbox(self):
         debugRect = pygame.Surface((self.hitbox.width,self.hitbox.height))
         debugRect.set_alpha(128)

@@ -1,24 +1,41 @@
-import pygame
-from pygame.locals import *
+import math
 import random
-from player import Player
-from constants import *
+
+# Facemesh
+import cv2
+import mediapipe as mp
+from pygame.locals import *
+
+import globals
 from background import Background
+from constants import *
+from enemy import Enemy
 from events import *
 from gameplatform import GamePlatform
 from money import Money
-from enemy import Enemy
+from player import Player
 from shield import Shield
-import globals
-
-#Facemesh
-import cv2
-import mediapipe as mp
-import math
 from webcam import Webcam
+
 
 class Game:
     def __init__(self):
+        self.webcamImage = None
+        self.retry = None
+        self.group_powerups = None
+        self.powerups = None
+        self.text_score_rect = None
+        self.text_score = None
+        self.score = None
+        self.last_frame_time = None
+        self.start_time = None
+        self.platformWillBeCreated = None
+        self.group_platforms = None
+        self.difficulty = None
+        self.platforms = None
+        self.dead = None
+        self.no_face = None
+        self.player = None
         self.screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
         self.clock = pygame.time.Clock()
         self.running = True
@@ -30,31 +47,58 @@ class Game:
         pygame.init()
         pygame.display.set_caption("Plataformas")
 
-        #2 fondos para manejar el paralaje. El detalle puedes leerlo
-        #en background.py
+        # 2 fondos para manejar el paralaje. El detalle puedes leerlo
+        # en background.py
         self.background1 = Background(True, .05, "2", 0)
         self.background2 = Background(False, .2, "3", 40)
 
         self.font = pygame.font.Font('freesansbold.ttf', 32)
         self.smaller_font = pygame.font.Font('freesansbold.ttf', 22)
 
-        #Sonidillos
+        # Sonidillos
         self.powerup_sound = pygame.mixer.Sound("sound/powerup.wav")
         self.powerup_sound.set_volume(.1)
         self.death_sound = pygame.mixer.Sound("sound/grunt2.wav")
 
         self.initialize()
 
+    def loop(self):
+        print("START LOOP")
+        with self.mp_face_mesh.FaceMesh(
+            static_image_mode=False,
+            max_num_faces=1,
+            min_detection_confidence=0.5,
+            refine_landmarks=True
+        ) as self.face_mesh:
+            while self.running:
+                if not self.webcam.ready():
+                    print("NOT WEBCAM READY")
+                    continue
+                print("WEBCAM READY")
+                time = pygame.time.get_ticks()
+                if self.last_frame_time == -1:
+                    delta_time = 1
+                else:
+                    delta_time = time - self.last_frame_time
+
+                self.last_frame_time = time
+                self.process_camera()
+                self.update(delta_time)
+                self.render()
+                self.clock.tick(60)
+            print("END LOOP")
+            pygame.quit()
+
     def initialize(self):
+        print("START INITIALIZE")
         self.player = Player()
         self.no_face = False
         self.dead = False
-
         self.platforms = []
 
-        #La primera plataforma grande
-        #Descomentar para tener una gigante inicial y probar cosas
-        #platform = GamePlatform(2000, 0)
+        # La primera plataforma grande
+        # Descomentar para tener una gigante inicial y probar cosas
+        # platform = GamePlatform(2000, 0)
         platform = GamePlatform(20, 0)
         self.platforms.append(platform)
         self.difficulty = 1
@@ -69,7 +113,7 @@ class Game:
         self.text_score = None
         self.text_score_rect = None
 
-        #powerups = el dinero. se llama asi porque segun yo iba a agregar mas pero nunca lo hice
+        # powerups = el dinero. se llama asi porque segun yo iba a agregar mas pero nunca lo hice
         self.powerups = []
         self.group_powerups = pygame.sprite.Group()
         pygame.time.set_timer(CREATE_NEW_MONEY, 1000)
@@ -82,20 +126,21 @@ class Game:
         self.group_shields = pygame.sprite.Group()
         pygame.time.set_timer(CREATE_NEW_SHIELD, 10000)
 
-        #Este tiene mas detalles de webcam para mostrar solo la boca en el cuadrito
+        # Este tiene mas detalles de webcam para mostrar solo la boca en el cuadrito
         self.webcam = Webcam().start()
-        self.webcamImage=None
-        self.face_left_x=0
-        self.face_right_x=0
-        self.face_top_y=0
-        self.face_bottom_y=0
-        self.mouth_left_x=0
-        self.mouth_right_x=0
-        self.mouth_top_y=0
-        self.mouth_bottom_y=0
-        self.mouthWasOpen=False
+        self.webcamImage = None
+        self.face_left_x = 0
+        self.face_right_x = 0
+        self.face_top_y = 0
+        self.face_bottom_y = 0
+        self.mouth_left_x = 0
+        self.mouth_right_x = 0
+        self.mouth_top_y = 0
+        self.mouth_bottom_y = 0
+        self.mouthWasOpen = False
 
-        self.max_face_area_height=0
+        self.max_face_area_height = 0
+        print("END INITIALIZE")
 
     def update(self, delta_time):
         events = pygame.event.get()
@@ -117,8 +162,8 @@ class Game:
             return
 
         for event in events:
-            #Descomentar estos primeros 2 si quieres que la barra
-            #espaciadora NO brinque
+            # Descomentar estos primeros 2 si quieres que la barra
+            # espaciadora NO brinque
             if event.type == KEYDOWN:
                 if event.key == K_SPACE:
                     self.player.jump()
@@ -131,7 +176,7 @@ class Game:
                 self.player.cancel_jump()
             elif event.type == CREATE_NEW_PLATFORM:
                 self.platformWillBeCreated = False
-                #Basar el tamano en la dificultad
+                # Basar el tamano en la dificultad
                 min = 1
                 if self.difficulty <= 3:
                     min = 3
@@ -140,7 +185,7 @@ class Game:
                     max = 4
                 tileNumber = random.randrange(min, max)
 
-                #Basar el espacio entre plataformas en la dificultad
+                # Basar el espacio entre plataformas en la dificultad
                 min_space = 90 + (self.difficulty*2)
                 if min_space > 150:
                     min_space = 150
@@ -158,7 +203,7 @@ class Game:
                 self.powerups.append(money)
                 self.group_powerups.add(money)
 
-                #Calculos para ver cuando crear mas dinero, segun la dificultad
+                # Calculos para ver cuando crear mas dinero, segun la dificultad
                 min_time = 4000 - self.difficulty*500
                 if min_time < 2000:
                     min_time = 2000
@@ -166,14 +211,14 @@ class Game:
                 if max_time < 4000:
                     max_time = 4000
 
-                #TODO al final ni los use HOHOH revisar
+                # TODO al final ni los use HOHOH revisar
                 pygame.time.set_timer(CREATE_NEW_MONEY, random.randint(3000, 10000))
             elif event.type == CREATE_NEW_ENEMY:
                 enemy = Enemy()
                 self.enemies.append(enemy)
                 self.group_enemies.add(enemy)
 
-                #Cuando crear un nuevo enemigo? Basado en la dificultad
+                # Cuando crear un nuevo enemigo? Basado en la dificultad
                 min_time = 4000 - self.difficulty*500
                 if min_time < 2000:
                     min_time = 2000
@@ -192,7 +237,7 @@ class Game:
                 if max_time < 4000:
                     max_time = 4000
 
-                #TODO usar min_time y max_time, ajustarlos XD
+                # TODO usar min_time y max_time, ajustarlos XD
                 pygame.time.set_timer(CREATE_NEW_SHIELD, random.randint(10000, 20000))
 
         if not self.player.dead:
@@ -201,10 +246,10 @@ class Game:
             self.player.update(delta_time, self.group_platforms, self.group_powerups, self.group_enemies, self.group_shields)
             if self.player.dead or self.player.rect.top > SCREEN_HEIGHT:
                 if self.player.shield:
-                    #Moriste pero tienes escudo? No morir!
+                    # Moriste pero tienes escudo? No morir!
                     self.player.shield_save()
                 else:
-                    #No tenias escudo. Dead
+                    # No tenias escudo. Dead
                     self.dead = True
                     pygame.mixer.Sound.play(self.death_sound)
 
@@ -220,17 +265,17 @@ class Game:
             self.group_enemies.update(delta_time)
             self.group_shields.update(delta_time)
 
-            #Generar nueva plataforma?
+            # Generar nueva plataforma?
             if (SCREEN_WIDTH - self.platforms[-1].rect.right > 0) and not self.platformWillBeCreated:
                 self.platformWillBeCreated = True
                 pygame.event.post(pygame.event.Event(CREATE_NEW_PLATFORM))
 
-            #Hacer mas dificil
+            # Hacer mas dificil
             seconds = int( (pygame.time.get_ticks() - self.start_time) / 1000)
             self.difficulty = int( 1+(seconds/10) )
             globals.game_speed = 1 + (self.difficulty*.2)
 
-            #Score
+            # Score
             self.score += globals.game_speed * delta_time
             self.text_score = self.font.render('Score: ' + str(int(self.score/1000)), True, (255,255,255))
             self.text_score_rect = self.text_score.get_rect()
@@ -240,19 +285,19 @@ class Game:
     def render(self):
         self.screen.fill((92, 89, 92))
 
-        #Fondo
+        # Fondo
         self.background1.render(self.screen)
         self.background2.render(self.screen)
 
         if self.webcam.lastFrame is not None:
             self.render_camera()
 
-        #Plataformas
+        # Plataformas
         for platform in self.platforms:
             self.screen.blit(platform.surf, platform.rect)
 
         self.screen.blit(self.player.surf, self.player.rect)
-        if (self.player.shield):
+        if self.player.shield:
             self.screen.blit(self.player.shieldSurf, self.player.shieldRect)
 
         for powerup in self.group_powerups:
@@ -280,7 +325,7 @@ class Game:
     def render_camera(self):
         webcamImageSurface = pygame.image.frombuffer(self.webcamImage, (int(self.webcam.width()), int(self.webcam.height())), "BGR")
 
-        #Mostrar la boca
+        # Mostrar la boca
         self.mouth_left_x = self.mouth_left_x - .03
         if self.mouth_left_x < 0:
             self.mouth_left_x = 0
@@ -313,29 +358,6 @@ class Game:
         onlyMouthSurface = pygame.transform.scale(onlyMouthSurface, (int(mouth_area_width),int(mouth_area_height)))
         self.screen.blit(onlyMouthSurface, onlyMouthSurface.get_rect())
 
-    def loop(self):
-        with self.mp_face_mesh.FaceMesh(
-            static_image_mode=False,
-            max_num_faces=1,
-            min_detection_confidence=0.5,
-            refine_landmarks=True
-        ) as self.face_mesh:
-            while self.running:
-                if not self.webcam.ready():
-                    continue
-                time = pygame.time.get_ticks()
-                if self.last_frame_time == -1:
-                    delta_time = 1
-                else:
-                    delta_time = time - self.last_frame_time
-
-                self.last_frame_time = time
-                self.process_camera()
-                self.update(delta_time)
-                self.render()
-                self.clock.tick(60)
-            pygame.quit()
-
     def process_camera(self):
         image = self.webcam.read()
         if image is not None:
@@ -346,6 +368,7 @@ class Game:
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             results = self.face_mesh.process(image)
             self.webcamImage = image
+            
             if results.multi_face_landmarks is not None:
                 self.no_face = False
                 for face_landmarks in results.multi_face_landmarks:
@@ -356,7 +379,7 @@ class Game:
                         self.mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=1, circle_radius=1),
                         self.mp_drawing.DrawingSpec(color=(150, 150, 150), thickness=1))
 
-                    #Coordenadas del cuadro de la cara y de la boca
+                    # Coordenadas del cuadro de la cara y de la boca
                     self.face_left_x = face_landmarks.landmark[234].x
                     self.face_right_x = face_landmarks.landmark[454].x
                     self.face_top_y = face_landmarks.landmark[10].y
@@ -380,13 +403,13 @@ class Game:
                     
                     face_height = (bottom[1] - top[1])
 
-                    #Obtener la distancia real de la boca dividida entre la cara
-                    #para que sea mas 'relativamente constante'
+                    # Obtener la distancia real de la boca dividida entre la cara
+                    # para que sea mas 'relativamente constante'
                     real_distance = distanceBetweenMouthPoints * self.webcam.height()
                     relative_distance = real_distance / face_height
 
-                    #Quiza deberia ser mejor calibrar esto, ya que depende
-                    #del angulo de la persona vs la camara :|
+                    # Quiza deberia ser mejor calibrar esto, ya que depende
+                    # del angulo de la persona vs la camara :|
                     if not self.mouthWasOpen and relative_distance > 10:
                         pygame.event.post(pygame.event.Event(MOUTH_OPENED))
 
@@ -397,6 +420,6 @@ class Game:
             else:
                 self.no_face = True
 
-            #Descomenta esto si quieres ver tu cara fea en otra ventana
-            #cv2.imshow("Frame", image)
+            # Descomenta esto si quieres ver tu cara fea en otra ventana
+            # cv2.imshow("Frame", image)
             k = cv2.waitKey(1) & 0xFF

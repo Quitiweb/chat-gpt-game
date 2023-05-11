@@ -1,6 +1,7 @@
 from threading import Thread
 import cv2
-    
+
+
 class Webcam:
     def __init__(self):
         self.stopped = False
