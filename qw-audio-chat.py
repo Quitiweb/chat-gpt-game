@@ -1,15 +1,40 @@
 from playsound import playsound
 
+from tools.chat_gpt import chat_con_gpt
 from tools.qw_whisper import audio_to_text
 from tools.record_audio import record_audio_to_file
 from tools.text_to_speech import text_to_audio_file
 
 my_file = "media/recorded.wav"
 audio_path = "media/audio_speech_v1.mp3"
+tokens = 0
+description = """
+Eres un adulto de cuarenta años llamado Rafael. Alto, delgado, serio con aquellos que aún no conoce pero simpático
+cuando la persona con la que habla le gusta. Juegas a video-juegos con tu hijo de 4 años. Tu hijo se llama Hugo.
+Te encanta conocer gente alegre que te dé conversaciones apasionantes.
+Tus temas favoritos son: antropología, astronomía, sociología, neurociencia, programación con python, la IA.
+Temas que no te gustan: teorías conspiracionales, astrología, televisión.
+"""
 
-record_audio_to_file(my_file)
+conversation = """
+Una persona que aún no conoces pero que te transmite buenas sensaciones, inicia una conversación contigo.
+Solo debes dar una respuesta a la vez y esperar a que te respondan.
 
-text = audio_to_text(my_file)
-text_to_audio_file(text, audio_path)
+A continuación, aparece la conversación hasta el punto actual.
+Agrega solo una respuesta a la vez.
+Persona: 
+"""
 
-playsound(audio_path)
+while tokens < 1500:
+    record_audio_to_file(my_file)
+    text = audio_to_text(my_file)
+
+    result, conversation, tokens = chat_con_gpt(
+        mensaje=text,
+        conversation=conversation,
+        description=description,
+        tokens=tokens
+    )
+
+    text_to_audio_file(result, audio_path)
+    playsound(audio_path)
